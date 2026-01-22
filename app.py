@@ -10,7 +10,7 @@ import os
 
 st.set_page_config(page_title="Extreme Rainfall Forecasting System", layout="wide")
 
-st.title("Extreme Rainfall Forecasting System (Risk-Aware TCN)")
+st.title("Extreme Rainfall Forecasting System")
 st.markdown("**Case Study: Kuching, Miri, Sibu**")
 
 # -----------------------------
