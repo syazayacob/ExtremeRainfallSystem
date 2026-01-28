@@ -201,7 +201,7 @@ if uploaded_file is not None:
         # Display Result
         st.divider()
         st.subheader("📊 Forecast Result")
-        st.metric("Forecasted Rainfall", f"{y_pred_mm:.2f} mm")
+        st.metric("### Forecasted Rainfall", f"{y_pred_mm:.2f} mm")
         st.markdown(f"### 🚨 Risk Level: :{color}[{risk}]")
         st.info(msg)
 
