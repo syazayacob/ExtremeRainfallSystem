@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow import keras
 from tcn import TCN
+from datetime import datetime
 
 # Streamlit Configuration
 
@@ -39,7 +40,7 @@ def asymmetric_mse(y_true, y_pred):
 
 
 # -----------------------------
-# 3. Load Model & Scaler
+# 2. Load Model & Scaler
 # -----------------------------
 
 @st.cache_resource
@@ -63,7 +64,7 @@ def load_model_and_scaler(model_dir):
     return model, scaler, feature_cols
 
 # -----------------------------
-# 4. Sidebar Station Selection 
+# 3. Sidebar Station Selection 
 # -----------------------------
 with st.sidebar:
     st.header("Settings")
@@ -128,7 +129,7 @@ if uploaded_file is not None:
 
     
     # -------------------------------------------------
-    # 7. UI Metrics Dashboard (Modern Style)
+    # 6. UI Metrics Dashboard (Modern Style)
     # -------------------------------------------------
 
     last_day = df_recent.iloc[-1]
@@ -159,14 +160,14 @@ if uploaded_file is not None:
 
     
     # -----------------------------
-    # 8. Trend Visualization
+    # 7. Trend Visualization
     # -----------------------------
     st.subheader("📈 Temperature & Humidity Trend (30d)")
     st.area_chart(df_recent[['wet_bulb_c', 'relative_humidity_percent']].tail(30))
     
 
     # -----------------------------
-    # 9. Prediction
+    # 8. Prediction
     # -----------------------------
     SEQ_LEN = 30
     if len(df_recent) < SEQ_LEN:
@@ -209,7 +210,7 @@ if uploaded_file is not None:
 
         
         # -----------------------------
-        # 10. Visualization: Plot Last 30 Days + Forecast
+        # 9. Visualization: Plot Last 30 Days + Forecast
         # -----------------------------
 
         fig, ax = plt.subplots(figsize=(10, 4))
