@@ -18,7 +18,7 @@ st.markdown("""
     [data-testid="stMetricValue"] { font-size: 28px; }
     .main { background-color: #f8f9fa; }
     </style>
-    """, unsafe_index=True)
+    """, unsafe_allow_html=True) # Corrected parameter name
 
 st.title("🌧️ Extreme Rainfall Forecasting System")
 st.markdown("**Risk-Aware TCN | Case Study: Kuching, Miri, Sibu**")
