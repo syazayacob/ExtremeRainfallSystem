@@ -12,13 +12,14 @@ import tensorflow as tf
 from tensorflow import keras
 from tcn import TCN
 from datetime import datetime
+import pydeck as pdk
 
 # -----------------------------
 # Streamlit Configuration
 # -----------------------------
 st.set_page_config(page_title="Extreme Rainfall Forecasting System", layout="wide")
 
-# Custom CSS for modern dashboard look
+# Custom CSS to match the modern dashboard look
 st.markdown("""
     <style>
     [data-testid="stMetricValue"] { font-size: 28px; }
@@ -37,7 +38,7 @@ def asymmetric_mse(y_true, y_pred):
     loss = tf.where(diff < 0, tf.square(diff) * 2.0, tf.square(diff))
     return tf.reduce_mean(loss)
 
-# Station coordinates
+# Define coordinates for the stations
 STATION_COORDS = {
     "Kuching": {"lat": 1.5533, "lon": 110.3592},
     "Miri": {"lat": 4.3995, "lon": 113.9914},
@@ -90,7 +91,7 @@ uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
 if uploaded_file is not None:
     df_recent = pd.read_csv(uploaded_file)
     
-    # Clean column names
+    # Clean up column names
     df_recent.columns = df_recent.columns.str.strip().str.lower()
     df_recent = df_recent.rename(columns={
         "relative_humidity": "relative_humidity_percent",
@@ -116,31 +117,53 @@ if uploaded_file is not None:
     df_recent["is_extreme"] = (df_recent["rainfall_mm"] >= Q95_THRESHOLD).astype(int)
 
     # -----------------------------
-    # 6. Station Location & Details (Before Generate Button)
+    # 6. UI Metrics Dashboard
     # -----------------------------
-    st.subheader(f"📍 Station Location: {station}")
-    station_map_data = pd.DataFrame([STATION_COORDS[station]])
-    st.map(station_map_data, zoom=10 if station == "Kuching" else 11)
+    last_day = df_recent.iloc[-1]
+    prev_day = df_recent.iloc[-2]
 
-    st.subheader("Station Details")
-    st.write(f"**Region:** Sarawak, Malaysia")
-    st.write(f"**Latitude:** {STATION_COORDS[station]['lat']}")
-    st.write(f"**Longitude:** {STATION_COORDS[station]['lon']}")
-    st.info("The TCN model uses historical patterns specific to this micro-climate.")
+    st.divider()
+    st.subheader(f"📍 Current Conditions at {station}")
+    
+    # Grid Row 1
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Rainfall", f"{last_day['rainfall_mm']} mm", 
+              delta=f"{round(last_day['rainfall_mm'] - prev_day['rainfall_mm'], 1)} mm")
+    m2.metric("Humidity", f"{last_day['relative_humidity_percent']}%", 
+              delta=f"{round(last_day['relative_humidity_percent'] - prev_day['relative_humidity_percent'], 1)}%")
+    m3.metric("Wind Speed", f"{last_day['wind_ms']} m/s", 
+              delta=f"{round(last_day['wind_ms'] - prev_day['wind_ms'], 2)} m/s", delta_color="inverse")
+    m4.metric("Pressure", f"{last_day['pressure_hpa']} hPa", 
+              delta=f"{round(last_day['pressure_hpa'] - prev_day['pressure_hpa'], 1)} hPa", delta_color="normal")
+
+    # Grid Row 2
+    m5, m6, m7, m8 = st.columns(4)
+    m5.metric("Wet Bulb Temp", f"{last_day['wet_bulb_c']}°C", 
+              delta=f"{round(last_day['wet_bulb_c'] - prev_day['wet_bulb_c'], 1)}°C")
+    m6.metric("Evaporation", f"{last_day['evaporation_mm']} mm", 
+              delta=f"{round(last_day['evaporation_mm'] - prev_day['evaporation_mm'], 2)} mm")
+    m7.metric("Cloud Cover", f"{int(last_day['cloud_cover_oktas'])} Oktas")
+    m8.metric("Extreme Regime", "YES" if last_day['is_extreme'] == 1 else "NO")
 
     # -----------------------------
-    # 7. Generate Forecast Button
+    # 7. Trend Visualization
     # -----------------------------
+    st.subheader("📈 Temperature & Humidity Trend (30d)")
+    st.area_chart(df_recent[['wet_bulb_c', 'relative_humidity_percent']].tail(30))
+
+    # -----------------------------
+    # 8. Prediction
+    # -----------------------------
+    SEQ_LEN = 30
+    if len(df_recent) < SEQ_LEN:
+        st.warning(f"Note: Using only available {len(df_recent)} days. 30 days is optimal.")
+        pad_size = SEQ_LEN - len(df_recent)
+        X_raw = np.pad(df_recent[feature_cols].values, ((pad_size, 0), (0, 0)), mode='edge')
+    else:
+        X_raw = df_recent[feature_cols].values[-SEQ_LEN:]
+
     if st.button("🔮 Generate Next-Day Forecast", type="primary"):
-        SEQ_LEN = 30
-        if len(df_recent) < SEQ_LEN:
-            st.warning(f"Note: Using only available {len(df_recent)} days. 30 days is optimal.")
-            pad_size = SEQ_LEN - len(df_recent)
-            X_raw = np.pad(df_recent[feature_cols].values, ((pad_size, 0), (0, 0)), mode='edge')
-        else:
-            X_raw = df_recent[feature_cols].values[-SEQ_LEN:]
-
-        # Scale and predict
+        # Scale and Predict
         X_scaled = scaler.transform(X_raw)
         X_input = X_scaled.reshape(1, SEQ_LEN, len(feature_cols))
         y_pred_scaled = model.predict(X_input)[0, 0]
@@ -152,42 +175,45 @@ if uploaded_file is not None:
         
         # Risk Logic
         if y_pred_mm < 40:
-            risk, color, msg = "NORMAL", "green", "🟢 No immediate flood risk."
+            risk, color, hex_color, msg = "NORMAL", "green", [0, 255, 0, 160], "🟢 No immediate flood risk."
         elif y_pred_mm < 60:
-            risk, color, msg = "HEAVY RAIN", "orange", "🟡 Monitor conditions. Potential localized flooding."
+            risk, color, hex_color, msg = "HEAVY RAIN", "orange", [255, 165, 0, 160], "🟡 Monitor conditions. Potential localized flooding."
         else:
-            risk, color, msg = "EXTREME RAINFALL", "red", "🔴 HIGH RISK: Flood alert. Preparedness required."
+            risk, color, hex_color, msg = "EXTREME RAINFALL", "red", [255, 0, 0, 200], "🔴 HIGH RISK: Flood alert. Preparedness required."
 
-        # -----------------------------
-        # 8. Metrics Dashboard
-        # -----------------------------
-        last_day = df_recent.iloc[-1]
-        prev_day = df_recent.iloc[-2]
-
+        # Display Result
         st.divider()
-        st.subheader(f"📊 Forecast Result for {station}")
-
-        # Metrics
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Rainfall", f"{last_day['rainfall_mm']} mm", 
-                  delta=f"{round(last_day['rainfall_mm'] - prev_day['rainfall_mm'], 1)} mm")
-        m2.metric("Humidity", f"{last_day['relative_humidity_percent']}%", 
-                  delta=f"{round(last_day['relative_humidity_percent'] - prev_day['relative_humidity_percent'], 1)}%")
-        m3.metric("Wind Speed", f"{last_day['wind_ms']} m/s", 
-                  delta=f"{round(last_day['wind_ms'] - prev_day['wind_ms'], 2)} m/s", delta_color="inverse")
-        m4.metric("Pressure", f"{last_day['pressure_hpa']} hPa", 
-                  delta=f"{round(last_day['pressure_hpa'] - prev_day['pressure_hpa'], 1)} hPa", delta_color="normal")
-
-        # Forecasted Rainfall & Risk
-        st.metric("Forecasted Rainfall", f"{y_pred_mm:.2f} mm")
+        st.subheader("📊 Forecast Result")
+        st.metric(f"### Forecasted Rainfall", f"{y_pred_mm:.2f} mm")
         st.markdown(f"### 🚨 Risk Level: :{color}[{risk}]")
         st.info(msg)
 
-        # -----------------------------
-        # 9. Trend Visualization
-        # -----------------------------
-        st.subheader("📈 Temperature & Humidity Trend (Last 30 Days)")
-        st.area_chart(df_recent[['wet_bulb_c', 'relative_humidity_percent']].tail(30))
+        # PyDeck Map for Risk
+        st.subheader(f"Flood Risk Map: {station}")
+        view_state = STATION_COORDS[station]
+        map_df = pd.DataFrame([{
+            "lat": view_state["lat"],
+            "lon": view_state["lon"],
+            "name": station,
+            "color": hex_color
+        }])
+        st.pydeck_chart(pdk.Deck(
+            map_style='mapbox://styles/mapbox/light-v9',
+            initial_view_state=pdk.ViewState(
+                latitude=view_state["lat"],
+                longitude=view_state["lon"],
+                zoom=11,
+                pitch=45,
+            ),
+            layers=[pdk.Layer(
+                'ScatterplotLayer',
+                data=map_df,
+                get_position='[lon, lat]',
+                get_color='color',
+                get_radius=500,
+                pickable=True
+            )],
+        ))
 
         # Rainfall Plot
         fig, ax = plt.subplots(figsize=(10, 4))
@@ -198,6 +224,24 @@ if uploaded_file is not None:
         ax.set_ylabel("Rainfall (mm)")
         ax.legend()
         st.pyplot(fig)
+
+        # -----------------------------
+        # 9. Geographical Context Map
+        # -----------------------------
+        st.divider()
+        col_map, col_info = st.columns([2, 1])
+        
+        with col_map:
+            st.subheader(f"📍 Station Location: {station}")
+            map_data = pd.DataFrame([STATION_COORDS[station]])
+            st.map(map_data, zoom=10 if station == "Kuching" else 11)
+        
+        with col_info:
+            st.subheader("Station Details")
+            st.write(f"**Region:** Sarawak, Malaysia")
+            st.write(f"**Latitude:** {STATION_COORDS[station]['lat']}")
+            st.write(f"**Longitude:** {STATION_COORDS[station]['lon']}")
+            st.info("The TCN model uses historical patterns specific to this micro-climate.")
 
     # -----------------------------
     # Footer
