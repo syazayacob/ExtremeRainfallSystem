@@ -117,8 +117,7 @@ if uploaded_file is not None:
 
     # The scaler expects 8 columns, but the CSV usually has 7 physical ones
     physical_features = [c for c in feature_cols if c != "is_extreme"]
-
-    missing = [c for c in feature_cols if c not in df_recent.columns]
+    missing = [c for c in physical_features if c not in df_recent.columns]
     
     if missing:
         st.error(f"Missing required columns: {missing}")
