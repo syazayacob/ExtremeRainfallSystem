@@ -104,11 +104,12 @@ if uploaded_file is not None:
         st.error(f"Missing required columns: {missing}")
         st.stop()
 
-    # Create the 8th feature using your specific model threshold
-    if "is_extreme" not in df_recent.columns:
-        # Using your exact Q95 threshold: 47.73
-        df_recent["is_extreme"] = (df_recent["rainfall_mm"] >= Q95_THRESHOLD).astype(int)
-        st.info(f"Note: 'is_extreme' column generated using threshold {Q95_THRESHOLD}mm")
+    # Create is_extreme feature (MODEL-EXPECTED)
+    df_recent["is_extreme"] = (df_recent["rainfall_mm"] >= Q95_THRESHOLD).astype(int)
+
+    st.info(
+        f"'is_extreme' feature generated internally using threshold {Q95_THRESHOLD} mm"
+    )
     
     # -----------------------------
     # 6. Build Sequence
