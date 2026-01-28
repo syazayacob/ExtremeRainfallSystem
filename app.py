@@ -98,83 +98,83 @@ if uploaded_file is not None:
         st.error(f"Missing required columns: {missing}")
         st.stop()
     
-        # -----------------------------
-        # 6. Build Sequence
-        # -----------------------------
+    # -----------------------------
+    # 6. Build Sequence
+    # -----------------------------
 
-        SEQ_LEN = 30
+    SEQ_LEN = 30
 
-        if len(df_recent) < SEQ_LEN:
-            st.error("At least 30 consecutive days of data are required.")
-            st.stop()
+    if len(df_recent) < SEQ_LEN:
+        st.error("At least 30 consecutive days of data are required.")
+        st.stop()
 
         
-        X_raw = df_recent[feature_cols].values[-SEQ_LEN:]
+    X_raw = df_recent[feature_cols].values[-SEQ_LEN:]
 
-        # Scale
-        X_scaled = scaler.transform(X_raw)
+    # Scale
+    X_scaled = scaler.transform(X_raw)
 
-        X_input = X_scaled.reshape(1, SEQ_LEN, len(feature_cols))
+    X_input = X_scaled.reshape(1, SEQ_LEN, len(feature_cols))
 
-        # -----------------------------
-        # 7. Predict
-        # -----------------------------
+    # -----------------------------
+    # 7. Predict
+    # -----------------------------
 
-        if st.button("🔮 Predict Next-Day Rainfall"):
+    if st.button("🔮 Predict Next-Day Rainfall"):
             
-            y_pred_scaled = model.predict(X_input)[0, 0]
+        y_pred_scaled = model.predict(X_input)[0, 0]
 
-            # Inverse scaling (rainfall assumed as first feature)
-            tmp = np.zeros((1, len(feature_cols)))
-            tmp[0, 0] = y_pred_scaled
-            y_pred_mm = scaler.inverse_transform(tmp)[0, 0]
+        # Inverse scaling (rainfall assumed as first feature)
+        tmp = np.zeros((1, len(feature_cols)))
+        tmp[0, 0] = y_pred_scaled
+        y_pred_mm = scaler.inverse_transform(tmp)[0, 0]
 
 
-            # -------------------------------------------------
-            # 8. Display Results
-            # -------------------------------------------------
+        # -------------------------------------------------
+        # 8. Display Results
+        # -------------------------------------------------
 
-            st.subheader("📊 Forecast Result")
+        st.subheader("📊 Forecast Result")
 
-            st.metric("Predicted Rainfall (mm)", f"{y_pred_mm:.2f}")
+        st.metric("Predicted Rainfall (mm)", f"{y_pred_mm:.2f}")
 
-            # -----------------------------
-            # 9. Risk Classification
-            # -----------------------------
+        # -----------------------------
+        # 9. Risk Classification
+        # -----------------------------
 
-            def classify_risk(rain_mm):
-                if rain_mm < 40:
-                    return "Normal", "🟢 No immediate flood risk."
-                elif rain_mm < 60:
-                    return "Heavy Rain", "🟡 Monitor conditions. Potential localized flooding."
-                else:
-                    return "Extreme Rainfall", "🔴 HIGH RISK: Flood alert. Preparedness required."
+        def classify_risk(rain_mm):
+            if rain_mm < 40:
+                return "Normal", "🟢 No immediate flood risk."
+            elif rain_mm < 60:
+                return "Heavy Rain", "🟡 Monitor conditions. Potential localized flooding."
+            else:
+                return "Extreme Rainfall", "🔴 HIGH RISK: Flood alert. Preparedness required."
 
-            risk_level, message = classify_risk(y_pred_mm)
+        risk_level, message = classify_risk(y_pred_mm)
 
-            st.markdown(f"### 🚨 Risk Level: **{risk_level}**")
-            st.info(message)
+        st.markdown(f"### 🚨 Risk Level: **{risk_level}**")
+        st.info(message)
 
-            # -----------------------------
-            # 10. Visualization: Plot Last 30 Days + Forecast
-            # -----------------------------
+        # -----------------------------
+        # 10. Visualization: Plot Last 30 Days + Forecast
+        # -----------------------------
 
-            fig, ax = plt.subplots(figsize=(10, 4))
-            ax.plot(
-                df_recent["rainfall_mm"].values[-SEQ_LEN:],
-                label="Observed (Last 30 Days)"
-            )
-            ax.scatter(
-                SEQ_LEN,
-                y_pred_mm,
-                color="red",
-                label="Forecast (t+1)"
-            )
+        fig, ax = plt.subplots(figsize=(10, 4))
+        ax.plot(
+            df_recent["rainfall_mm"].values[-SEQ_LEN:],
+            label="Observed (Last 30 Days)"
+        )
+        ax.scatter(
+            SEQ_LEN,
+            y_pred_mm,
+            color="red",
+            label="Forecast (t+1)"
+        )
 
-            ax.set_title(f"{station} – Rainfall Forecast")
-            ax.set_xlabel("Days")
-            ax.set_ylabel("Rainfall (mm)")
-            ax.legend()
+        ax.set_title(f"{station} – Rainfall Forecast")
+        ax.set_xlabel("Days")
+        ax.set_ylabel("Rainfall (mm)")
+        ax.legend()
 
-            st.pyplot(fig)
+        st.pyplot(fig)
 
