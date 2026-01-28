@@ -173,6 +173,7 @@ if uploaded_file is not None:
     # -----------------------------
     # 8. Prediction
     # -----------------------------
+    st.divider()
     SEQ_LEN = 30
     if len(df_recent) < SEQ_LEN:
         st.warning(f"Note: Using only available {len(df_recent)} days. 30 days is optimal.")
