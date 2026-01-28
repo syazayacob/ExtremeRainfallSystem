@@ -92,11 +92,19 @@ if uploaded_file is not None:
     # 5. Validate Input Columns
     # -------------------------------------------------
 
+    # The scaler expects 8 columns, but the CSV usually has 7 physical ones
+    physical_features = [c for c in feature_cols if c != "is_extreme"]
+
     missing = [c for c in feature_cols if c not in df_recent.columns]
     
     if missing:
         st.error(f"Missing required columns: {missing}")
         st.stop()
+
+    # Create the 8th feature using your specific model threshold
+    if "is_extreme" not in df_recent.columns:
+        # Using your exact Q95 threshold: 47.73
+        df_recent["is_extreme"] = (df_recent["rainfall_mm"] >= 47.73).astype(int)
     
     # -----------------------------
     # 6. Build Sequence
@@ -109,6 +117,7 @@ if uploaded_file is not None:
         st.stop()
 
         
+    # Now X_raw will have exactly 8 columns (7 physical + 1 'is_extreme')
     X_raw = df_recent[feature_cols].values[-SEQ_LEN:]
 
     # Scale
