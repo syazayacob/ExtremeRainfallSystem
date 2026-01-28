@@ -1,58 +1,84 @@
+# Extreme Rainfall Forecasting System (Model 2: Risk-Aware TCN)
+
 # app.py
 
-import streamlit as st
+import os
+import joblib
 import numpy as np
 import pandas as pd
-import joblib
-from tensorflow import keras
+import streamlit as st
 import matplotlib.pyplot as plt
-import os
+import tensorflow as tf
+from tensorflow import keras
+from tcn import TCN
+
+# Streamlit Configuration
 
 st.set_page_config(page_title="Extreme Rainfall Forecasting System", layout="wide")
 
-st.title("Extreme Rainfall Forecasting System")
-st.markdown("**Case Study: Kuching, Miri, Sibu**")
+st.title("🌧️ Extreme Rainfall Forecasting System")
+st.markdown("**Risk-Aware TCN | Case Study: Kuching, Miri, Sibu**")
+
+# -----------------------------------------------------
+# 1. Custom Loss Function (Risk-Aware)
+# -----------------------------------------------------
+# Penalizes underestimation of extreme rainfall
+
+def asymmetric_mse(y_true, y_pred):
+    diff = y_pred - y_true
+    loss = tf.where(diff < 0, tf.square(diff) * 2.0, tf.square(diff))
+    return tf.reduce_mean(loss)
 
 # -----------------------------
-# 1. Station Selection
+# 2. Station Selection
 # -----------------------------
 
 station = st.selectbox(
-    "Select Station",
+    "Select Rainfall Station",
     ["Kuching", "Miri", "Sibu"]
 )
 
-BASE_MODEL_DIR = {
+MODEL_DIRS = {
     "Kuching": "models/kuching",
     "Miri": "models/miri",
     "Sibu": "models/sibu"
 }
 
-model_dir = BASE_MODEL_DIR[station]
+model_dir = MODEL_DIRS[station]
 
 # -----------------------------
-# 2. Load Model & Scaler
+# 3. Load Model & Scaler
 # -----------------------------
 
 @st.cache_resource
 def load_model_and_scaler(model_dir):
-    model = keras.models.load_model(os.path.join(model_dir, "tcn_risk_aware.keras"))
-    scaler = joblib.load(os.path.join(model_dir, "scaler.save"))
+    #model = keras.models.load_model(os.path.join(model_dir, "tcn_risk_aware.keras"))
 
-    with open(os.path.join(model_dir, "feature_cols.txt")) as f:
+    # Load trained TCN model, scaler, and feature column list.
+    model = keras.models.load_model(
+        os.path.join(model_dir, "tcn_risk_aware.keras"),
+        custom_objects={
+            "TCN": TCN,
+            "asymmetric_mse": asymmetric_mse
+            }
+    )
+
+    scaler = joblib.load(os.path.join(model_dir, "robust_scaler.save"))
+
+    with open(os.path.join(model_dir, "feature_cols.txt"), "r") as f:
         feature_cols = [line.strip() for line in f.readlines()]
 
     return model, scaler, feature_cols
 
 model, scaler, feature_cols = load_model_and_scaler(model_dir)
 
-st.success(f"Loaded model for {station}")
+st.success(f"Model loaded successfully for **{station}**")
 
 # -----------------------------
-# 3. Upload Recent Data
+# 4. Upload Recent Data
 # -----------------------------
 
-st.subheader("Upload Recent 30-Day Data (CSV)")
+st.subheader("📤 Upload Recent 30-Day Meteorological Data (CSV)")
 
 uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
 
@@ -62,71 +88,93 @@ if uploaded_file is not None:
     st.write("Preview of uploaded data:")
     st.dataframe(df_recent.tail())
 
-    # Check columns
+    # -------------------------------------------------
+    # 5. Validate Input Columns
+    # -------------------------------------------------
+
     missing = [c for c in feature_cols if c not in df_recent.columns]
+    
     if missing:
         st.error(f"Missing required columns: {missing}")
-    else:
+        st.stop()
+    
         # -----------------------------
-        # 4. Build Sequence
+        # 6. Build Sequence
         # -----------------------------
 
         SEQ_LEN = 30
 
         if len(df_recent) < SEQ_LEN:
-            st.error("Need at least 30 days of data.")
-        else:
-            X_raw = df_recent[feature_cols].values[-SEQ_LEN:]
+            st.error("At least 30 consecutive days of data are required.")
+            st.stop()
 
-            # Scale
-            X_scaled = scaler.transform(X_raw)
+        
+        X_raw = df_recent[feature_cols].values[-SEQ_LEN:]
 
-            X_input = X_scaled.reshape(1, SEQ_LEN, len(feature_cols))
+        # Scale
+        X_scaled = scaler.transform(X_raw)
+
+        X_input = X_scaled.reshape(1, SEQ_LEN, len(feature_cols))
+
+        # -----------------------------
+        # 7. Predict
+        # -----------------------------
+
+        if st.button("🔮 Predict Next-Day Rainfall"):
+            
+            y_pred_scaled = model.predict(X_input)[0, 0]
+
+            # Inverse scaling (rainfall assumed as first feature)
+            tmp = np.zeros((1, len(feature_cols)))
+            tmp[0, 0] = y_pred_scaled
+            y_pred_mm = scaler.inverse_transform(tmp)[0, 0]
+
+
+            # -------------------------------------------------
+            # 8. Display Results
+            # -------------------------------------------------
+
+            st.subheader("📊 Forecast Result")
+
+            st.metric("Predicted Rainfall (mm)", f"{y_pred_mm:.2f}")
 
             # -----------------------------
-            # 5. Predict
+            # 9. Risk Classification
             # -----------------------------
 
-            if st.button("Predict Next-Day Rainfall"):
-                y_pred_scaled = model.predict(X_input)[0, 0]
+            def classify_risk(rain_mm):
+                if rain_mm < 40:
+                    return "Normal", "🟢 No immediate flood risk."
+                elif rain_mm < 60:
+                    return "Heavy Rain", "🟡 Monitor conditions. Potential localized flooding."
+                else:
+                    return "Extreme Rainfall", "🔴 HIGH RISK: Flood alert. Preparedness required."
 
-                # Inverse transform rainfall only
-                tmp = np.zeros((1, len(feature_cols)))
-                tmp[0, 0] = y_pred_scaled
-                y_pred_mm = scaler.inverse_transform(tmp)[0, 0]
+            risk_level, message = classify_risk(y_pred_mm)
 
-                st.subheader("Prediction Result")
+            st.markdown(f"### 🚨 Risk Level: **{risk_level}**")
+            st.info(message)
 
-                st.metric("Predicted Rainfall (mm)", f"{y_pred_mm:.2f}")
+            # -----------------------------
+            # 10. Visualization: Plot Last 30 Days + Forecast
+            # -----------------------------
 
-                # -----------------------------
-                # 6. Risk Classification
-                # -----------------------------
+            fig, ax = plt.subplots(figsize=(10, 4))
+            ax.plot(
+                df_recent["rainfall_mm"].values[-SEQ_LEN:],
+                label="Observed (Last 30 Days)"
+            )
+            ax.scatter(
+                SEQ_LEN,
+                y_pred_mm,
+                color="red",
+                label="Forecast (t+1)"
+            )
 
-                def classify_risk(rain_mm):
-                    if rain_mm < 40:
-                        return "Normal", "🟢 No immediate flood risk."
-                    elif rain_mm < 60:
-                        return "Heavy Rain", "🟡 Monitor conditions. Potential localized flooding."
-                    else:
-                        return "Extreme Rainfall", "🔴 HIGH RISK: Flood alert. Preparedness required."
+            ax.set_title(f"{station} – Rainfall Forecast")
+            ax.set_xlabel("Days")
+            ax.set_ylabel("Rainfall (mm)")
+            ax.legend()
 
-                risk_level, message = classify_risk(y_pred_mm)
-
-                st.markdown(f"### Risk Level: **{risk_level}**")
-                st.info(message)
-
-                # -----------------------------
-                # 7. Plot Last 30 Days + Forecast
-                # -----------------------------
-
-                fig, ax = plt.subplots(figsize=(10,4))
-                ax.plot(df_recent["rainfall_mm"].values[-SEQ_LEN:], label="Last 30 Days")
-                ax.scatter(SEQ_LEN, y_pred_mm, color="red", label="Forecast (t+1)")
-                ax.set_title(f"{station} Rainfall Forecast")
-                ax.set_xlabel("Days")
-                ax.set_ylabel("Rainfall (mm)")
-                ax.legend()
-
-                st.pyplot(fig)
+            st.pyplot(fig)
 
