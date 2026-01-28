@@ -178,6 +178,13 @@ if uploaded_file is not None:
     else:
         X_raw = df_recent[feature_cols].values[-SEQ_LEN:]
 
+    # Define coordinates for the stations
+    STATION_COORDS = {
+        "Kuching": {"lat": 1.5533, "lon": 110.3592},
+        "Miri": {"lat": 4.3995, "lon": 113.9914},
+        "Sibu": {"lat": 2.2873, "lon": 111.8305}
+    }
+
     if st.button("🔮 Generate Next-Day Forecast", type="primary"):
         # Scale and Predict
         X_scaled = scaler.transform(X_raw)
@@ -192,11 +199,11 @@ if uploaded_file is not None:
         
         # Risk Logic
         if y_pred_mm < 40:
-            risk, color, msg = "NORMAL", "green", "🟢 No immediate flood risk."
+            risk, color, hex_color, msg = "NORMAL", "green", [0, 255, 0, 160], "🟢 No immediate flood risk."
         elif y_pred_mm < 60:
-            risk, color, msg = "HEAVY RAIN", "orange", "🟡 Monitor conditions. Potential localized flooding."
+            risk, color, hex_color, msg = "HEAVY RAIN", "orange", [255, 165, 0, 160], "🟡 Monitor conditions. Potential localized flooding."
         else:
-            risk, color, msg = "EXTREME RAINFALL", "red", "🔴 HIGH RISK: Flood alert. Preparedness required."
+            risk, color, hex_color, msg = "EXTREME RAINFALL", "red", [255, 0, 0, 200], "🔴 HIGH RISK: Flood alert. Preparedness required."
 
         # Display Result
         st.divider()
@@ -204,6 +211,39 @@ if uploaded_file is not None:
         st.metric(f"### Forecasted Rainfall", f"{y_pred_mm:.2f} mm")
         st.markdown(f"### 🚨 Risk Level: :{color}[{risk}]")
         st.info(msg)
+
+        # Dynamic Map with Risk-Colored Pin
+        st.subheader(f"Flood Risk Map: {station}")
+        
+        # Prepare data for PyDeck
+        view_state = STATION_COORDS[station]
+        map_df = pd.DataFrame([{
+            "lat": view_state["lat"],
+            "lon": view_state["lon"],
+            "name": station,
+            "color": hex_color
+        }])
+
+        import pydeck as pdk
+        st.pydeck_chart(pdk.Deck(
+            map_style='mapbox://styles/mapbox/light-v9',
+            initial_view_state=pdk.ViewState(
+                latitude=view_state["lat"],
+                longitude=view_state["lon"],
+                zoom=11,
+                pitch=45,
+            ),
+            layers=[
+                pdk.Layer(
+                    'ScatterplotLayer',
+                    data=map_df,
+                    get_position='[lon, lat]',
+                    get_color='color',
+                    get_radius=500,
+                    pickable=True
+                ),
+            ],
+        ))
 
         
         # -----------------------------
