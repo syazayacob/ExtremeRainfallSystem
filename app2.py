@@ -195,11 +195,11 @@ if uploaded_file is not None:
         
         # Risk Logic
         if y_pred_mm < 40:
-            risk, color, hex_color, msg = "NORMAL", "green", "🟢 No immediate flood risk."
+            risk, color, msg = "NORMAL", "green", "🟢 No immediate flood risk."
         elif y_pred_mm < 60:
-            risk, color, hex_color, msg = "HEAVY RAIN", "orange", "🟡 Monitor conditions. Potential localized flooding."
+            risk, color, msg = "HEAVY RAIN", "orange", "🟡 Monitor conditions. Potential localized flooding."
         else:
-            risk, color, hex_color, msg = "EXTREME RAINFALL", "red", "🔴 HIGH RISK: Flood alert. Preparedness required."
+            risk, color, msg = "EXTREME RAINFALL", "red", "🔴 HIGH RISK: Flood alert. Preparedness required."
 
         # Display Result
         st.divider()
