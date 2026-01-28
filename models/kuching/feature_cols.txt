@@ -1,0 +1,8 @@
+rainfall_mm
+relative_humidity_percent
+wind_ms
+wet_bulb_c
+evaporation_mm
+cloud_cover_oktas
+pressure_hpa
+is_extreme
