@@ -152,6 +152,25 @@ if uploaded_file is not None:
     st.area_chart(df_recent[['wet_bulb_c', 'relative_humidity_percent']].tail(30))
 
     # -----------------------------
+    # 9. Geographical Context Map
+    # -----------------------------
+    st.divider()
+    col_map, col_info = st.columns([2, 1])
+        
+    with col_map:
+        st.subheader(f"📍 Station Location: {station}")
+        map_data = pd.DataFrame([STATION_COORDS[station]])
+        st.map(map_data, zoom=10 if station == "Kuching" else 11)
+        
+    with col_info:
+        st.subheader("Station Details")
+        st.write(f"**Region:** Sarawak, Malaysia")
+        st.write(f"**Latitude:** {STATION_COORDS[station]['lat']}")
+        st.write(f"**Longitude:** {STATION_COORDS[station]['lon']}")
+        st.info("The TCN model uses historical patterns specific to this micro-climate.")
+
+
+    # -----------------------------
     # 8. Prediction
     # -----------------------------
     SEQ_LEN = 30
@@ -175,11 +194,11 @@ if uploaded_file is not None:
         
         # Risk Logic
         if y_pred_mm < 40:
-            risk, color, hex_color, msg = "NORMAL", "green", [0, 255, 0, 160], "🟢 No immediate flood risk."
+            risk, color, hex_color, msg = "NORMAL", "green", "🟢 No immediate flood risk."
         elif y_pred_mm < 60:
-            risk, color, hex_color, msg = "HEAVY RAIN", "orange", [255, 165, 0, 160], "🟡 Monitor conditions. Potential localized flooding."
+            risk, color, hex_color, msg = "HEAVY RAIN", "orange", "🟡 Monitor conditions. Potential localized flooding."
         else:
-            risk, color, hex_color, msg = "EXTREME RAINFALL", "red", [255, 0, 0, 200], "🔴 HIGH RISK: Flood alert. Preparedness required."
+            risk, color, hex_color, msg = "EXTREME RAINFALL", "red", "🔴 HIGH RISK: Flood alert. Preparedness required."
 
         # Display Result
         st.divider()
@@ -188,32 +207,7 @@ if uploaded_file is not None:
         st.markdown(f"### 🚨 Risk Level: :{color}[{risk}]")
         st.info(msg)
 
-        # PyDeck Map for Risk
-        st.subheader(f"Flood Risk Map: {station}")
-        view_state = STATION_COORDS[station]
-        map_df = pd.DataFrame([{
-            "lat": view_state["lat"],
-            "lon": view_state["lon"],
-            "name": station,
-            "color": hex_color
-        }])
-        st.pydeck_chart(pdk.Deck(
-            map_style='mapbox://styles/mapbox/light-v9',
-            initial_view_state=pdk.ViewState(
-                latitude=view_state["lat"],
-                longitude=view_state["lon"],
-                zoom=11,
-                pitch=45,
-            ),
-            layers=[pdk.Layer(
-                'ScatterplotLayer',
-                data=map_df,
-                get_position='[lon, lat]',
-                get_color='color',
-                get_radius=500,
-                pickable=True
-            )],
-        ))
+        
 
         # Rainfall Plot
         fig, ax = plt.subplots(figsize=(10, 4))
@@ -225,23 +219,6 @@ if uploaded_file is not None:
         ax.legend()
         st.pyplot(fig)
 
-        # -----------------------------
-        # 9. Geographical Context Map
-        # -----------------------------
-        st.divider()
-        col_map, col_info = st.columns([2, 1])
-        
-        with col_map:
-            st.subheader(f"📍 Station Location: {station}")
-            map_data = pd.DataFrame([STATION_COORDS[station]])
-            st.map(map_data, zoom=10 if station == "Kuching" else 11)
-        
-        with col_info:
-            st.subheader("Station Details")
-            st.write(f"**Region:** Sarawak, Malaysia")
-            st.write(f"**Latitude:** {STATION_COORDS[station]['lat']}")
-            st.write(f"**Longitude:** {STATION_COORDS[station]['lon']}")
-            st.info("The TCN model uses historical patterns specific to this micro-climate.")
 
     # -----------------------------
     # Footer
