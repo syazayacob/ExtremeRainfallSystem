@@ -95,6 +95,13 @@ if uploaded_file is not None:
     # Define the threshold from your model training
     Q95_THRESHOLD = 47.73
 
+    # Create is_extreme feature (MODEL-EXPECTED)
+    df_recent["is_extreme"] = (df_recent["rainfall_mm"] >= Q95_THRESHOLD).astype(int)
+
+    st.info(
+        f"'is_extreme' feature generated internally using threshold {Q95_THRESHOLD} mm"
+    )
+
     # The scaler expects 8 columns, but the CSV usually has 7 physical ones
     physical_features = [c for c in feature_cols if c != "is_extreme"]
 
@@ -104,12 +111,7 @@ if uploaded_file is not None:
         st.error(f"Missing required columns: {missing}")
         st.stop()
 
-    # Create is_extreme feature (MODEL-EXPECTED)
-    df_recent["is_extreme"] = (df_recent["rainfall_mm"] >= Q95_THRESHOLD).astype(int)
 
-    st.info(
-        f"'is_extreme' feature generated internally using threshold {Q95_THRESHOLD} mm"
-    )
     
     # -----------------------------
     # 6. Build Sequence
