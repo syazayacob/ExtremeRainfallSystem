@@ -92,6 +92,9 @@ if uploaded_file is not None:
     # 5. Validate Input Columns
     # -------------------------------------------------
 
+    # Define the threshold from your model training
+    Q95_THRESHOLD = 47.73
+
     # The scaler expects 8 columns, but the CSV usually has 7 physical ones
     physical_features = [c for c in feature_cols if c != "is_extreme"]
 
@@ -104,7 +107,8 @@ if uploaded_file is not None:
     # Create the 8th feature using your specific model threshold
     if "is_extreme" not in df_recent.columns:
         # Using your exact Q95 threshold: 47.73
-        df_recent["is_extreme"] = (df_recent["rainfall_mm"] >= 47.73).astype(int)
+        df_recent["is_extreme"] = (df_recent["rainfall_mm"] >= Q95_THRESHOLD).astype(int)
+        st.info(f"Note: 'is_extreme' column generated using threshold {Q95_THRESHOLD}mm")
     
     # -----------------------------
     # 6. Build Sequence
