@@ -5,4 +5,3 @@ wet_bulb_c
 evaporation_mm
 cloud_cover_oktas
 pressure_hpa
-is_extreme
