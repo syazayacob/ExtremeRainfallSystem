@@ -55,7 +55,7 @@ def load_model_and_scaler(model_dir):
         custom_objects={
             "TCN": TCN,
             "asymmetric_mse": asymmetric_mse
-        }
+        } 
     )
     scaler = joblib.load(os.path.join(model_dir, "robust_scaler.save"))
     with open(os.path.join(model_dir, "feature_cols.txt"), "r") as f:
